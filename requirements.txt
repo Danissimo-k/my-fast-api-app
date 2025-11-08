@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+redis
+qdrant-client
+# для тестов
+pytest
+httpx
+
