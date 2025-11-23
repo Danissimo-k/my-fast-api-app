@@ -2,6 +2,8 @@ fastapi
 uvicorn
 redis
 qdrant-client
+requests
+pydantic
 # для тестов
 pytest
 httpx
