@@ -10,7 +10,7 @@ service:
   port: 80
 
 ingress:
-  enabled: true
+  enabled: false 
   className: "nginx"
   hosts:
     - host: my-app.k8s.labs.itmo.loc
