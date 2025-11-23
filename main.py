@@ -4,12 +4,28 @@ from fastapi import FastAPI, HTTPException
 from redis import Redis, ConnectionError as RedisConnectionError
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.exceptions import UnexpectedResponse
+import requests
+from pydantic import BaseModel, validator
+from typing import List
 
 # Получаем хосты из переменных окружения, чтобы приложение было гибким
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
-
+INFERENCE_SERVICE_URL = os.getenv(
+    "INFERENCE_SERVICE_URL", 
+    "http://inference-service.default.svc.cluster.local/invocations"
+)
 app = FastAPI()
+
+class PredictionRequest(BaseModel):
+    data: List[List[float]]
+
+    @validator('data', each_item=True)
+    def check_features_count(cls, v):
+        # Ваша модель была обучена на 10 признаках
+        if len(v) != 10:
+            raise ValueError('Каждый вектор данных должен содержать ровно 10 признаков')
+        return v
 
 # Инициализация клиентов
 try:
@@ -83,5 +99,39 @@ def vector_example():
     )
     return {"added_vector": vec, "closest_found": search_result}
 
+@app.post("/predict")
+def predict(request_data: PredictionRequest):
+    """
+    Принимает данные, отправляет их в inference-сервис и возвращает предсказание.
+    """
+    # 1. Форматируем данные для MLflow-сервера
+    columns = [f"feature_{i}" for i in range(10)]
+    mlflow_input = {
+        "dataframe_split": {
+            "columns": columns,
+            "data": request_data.data
+        }
+    }
+
+    try:
+        # 2. Отправляем запрос в inference-сервис
+        response = requests.post(INFERENCE_SERVICE_URL, json=mlflow_input, timeout=5)
+        response.raise_for_status()  # Вызовет ошибку для статусов 4xx/5xx
+
+        # 3. Возвращаем ответ от модели
+        return response.json()
+    
+    except requests.exceptions.RequestException as e:
+        # Если сервис модели недоступен
+        raise HTTPException(
+            status_code=503, 
+            detail=f"Inference service is unavailable: {e}"
+        )
+    except Exception as e:
+        # Другие возможные ошибки
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred during prediction: {e}"
+        )
 # Локальное тестирование
 # python -m uvicorn main:app --reload

@@ -1,0 +1,62 @@
+# inference/deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference-service
+  labels:
+    app: inference-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inference-service
+  template:
+    metadata:
+      labels:
+        app: inference-service
+    spec:
+      containers:
+      - name: inference-container
+        image: harbor.k8s.labs.itmo.loc/public/inference-service:v1.1
+        ports:
+        - containerPort: 8080
+        env:
+        # Передаем URI MLflow сервера
+        - name: MLFLOW_TRACKING_URI
+          value: "http://10.0.0.27:5000"
+        # Передаем имя модели
+        - name: MODEL_NAME
+          value: "itmo-lab4-model"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inference-service
+spec:
+  selector:
+    app: inference-service
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: inference-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+  - host: "inference.k8s.labs.itmo.loc"
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: inference-service
+            port:
+              number: 80
+
