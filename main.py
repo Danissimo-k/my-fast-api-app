@@ -8,6 +8,8 @@ import requests
 from pydantic import BaseModel, validator
 from typing import List
 
+
+
 # Получаем хосты из переменных окружения, чтобы приложение было гибким
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
